@@ -1075,7 +1075,7 @@
     </div>
     <div class="app-header-center">
       <div class="app-header-title">Gestor de informes</div>
-      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v1.01</div>
+      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v1.02</div>
       <div class="app-header-subtitle">Centros de Atención Social a Personas con Problemas de Salud Mental<br>Comprometidos contra la Violencia de Género</div>
     </div>
     <div class="app-header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
@@ -2707,7 +2707,7 @@ async function generateCoverPdf() {
   doc.setTextColor(40, 40, 40);
   doc.setFontSize(11.5);
   const pdfCenterTitle = toTitleCaseSpanish(pdfCenter);
-  const p1 = `El alcance de la evaluación corresponde al ${pdfCenterTitle}.`;
+  const p1 = `El alcance de la evaluación corresponde al centro ${pdfCenterTitle}.`;
   const p1Lines = doc.splitTextToSize(p1, pageW - margin * 2);
   drawJustifiedPdfParagraph(p1Lines, margin, y3, pageW - margin * 2, 6.2, false);
   y3 += p1Lines.length * 6.2 + 14;
@@ -2724,7 +2724,7 @@ async function generateCoverPdf() {
   const fullExternalDate = formatFullDateSpanish(externalEvalDate);
 
   const paragraphs = [
-    `El ${pdfCenterTitle} inició la autoevaluación en ${startMonthYear}, según los estándares propuestos en el programa de certificación de “Centros de Atención Social a Personas con Problemas de Salud Mental Comprometidos contra la Violencia de Género” y tomando como referencia el “Manual CASERO - Centros de Atención Social a Personas con Problemas de Salud Mental Comprometidos contra la Violencia de Género”.`,
+    `El centro ${pdfCenterTitle} inició la autoevaluación en ${startMonthYear}, según los estándares propuestos en el programa de certificación de “Centros de Atención Social a Personas con Problemas de Salud Mental Comprometidos contra la Violencia de Género” y tomando como referencia el “Manual de estándares de Centros de Atención Social a Personas con Problemas de Salud Mental Comprometidos contra la Violencia de Género”.`,
     `Las personas responsables de la entidad relacionados con el proyecto son:`,
     `Dirección Gerencia:`,
     `${centerManagement}`,
@@ -3337,7 +3337,7 @@ async function generateCoverPdf() {
     doc.addPage();
     drawReportHeaderFooter();
 
-    const text = `Por cumplirse todos los estándares y sumar el mayor número de fortalezas, el centro ${pdfCenterTitle} destaca en el criterio:`;
+    const text = `Por cumplirse todos los estándares esenciales y sumar el mayor número de fortalezas, el centro ${pdfCenterTitle} destaca en el criterio:`;
     const textY = 62;
 
     doc.setFont('helvetica', 'italic');
