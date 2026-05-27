@@ -2412,6 +2412,11 @@ async function imageDataFromElement(imgEl) {
     return { dataUrl: src, width: imgEl.naturalWidth, height: imgEl.naturalHeight };
   }
 
+  // En file://, no intentar fetch (siempre falla). Si llegamos aquí sin bundledLogo, devolver null.
+  if (window.location.protocol === 'file:') {
+    console.warn('Logo no encontrado en CCVG_PDF_LOGOS:', imgEl.id, '- omitiendo en file://');
+    return null;
+  }
   try {
     const response = await fetch(src);
     if (!response.ok) throw new Error(`No se pudo cargar ${src}`);
@@ -2423,12 +2428,7 @@ async function imageDataFromElement(imgEl) {
     };
   } catch (e) {
     console.warn('No se pudo leer el logo desde archivo.', e);
-    const isFileMode = window.location.protocol === 'file:';
-    throw new Error(
-      isFileMode
-        ? 'No se pueden leer los logos del PDF abriendo index.html directamente. Abre la aplicación con el lanzador local abrir_informe.command.'
-        : `No se pudo leer el logo del PDF: ${src}`
-    );
+    throw new Error(`No se pudo leer el logo del PDF: ${src}`);
   }
 }
 
