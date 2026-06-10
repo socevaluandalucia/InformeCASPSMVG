@@ -1075,7 +1075,7 @@
     </div>
     <div class="app-header-center">
       <div class="app-header-title">Gestor de informes</div>
-      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v1.02</div>
+      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v1.03</div>
       <div class="app-header-subtitle">Centros de Atención Social a Personas con Problemas de Salud Mental<br>Comprometidos contra la Violencia de Género</div>
     </div>
     <div class="app-header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
@@ -3403,7 +3403,7 @@ async function generateCoverPdf() {
     state.y += 16;
 
     if (isPendingStandards) {
-      state = addContinuationParagraph(state, 'El centro dispone de hasta un máximo de 90 días desde la comunicación del resultado para dar respuesta a los estándares que no han superado la evaluación, obligatoriamente en los estándares esenciales y de forma opcional los estándares no esenciales no cumplidos, debiendo alcanzar el mínimo establecido (17 estándares).', { skipEnsure: true });
+      state = addContinuationParagraph(state, 'El centro dispone de hasta un máximo de 60 días desde la comunicación del resultado para dar respuesta a los estándares que no han superado la evaluación, obligatoriamente en los estándares esenciales y de forma opcional los estándares no esenciales no cumplidos, debiendo alcanzar el mínimo establecido (17 estándares).', { skipEnsure: true });
       state = addBeltIaPendingParagraph(state);
       state = addContinuationParagraph(state, 'Del mismo modo, el centro deberá actualizar la información aportada en aquellos estándares esenciales y elementos orientativos imprescindibles que puedan comprometer el mantenimiento de la certificación.');
       state = addContinuationParagraph(state, 'Una vez se finalice esta fase, el equipo evaluador revisará los datos e informaciones aportadas para determinar si ofrecen garantía de que los requisitos de certificación (porcentaje mínimo de estándares y estándares esenciales) se consiguen. Durante este periodo todos los canales de comunicación entre el centro y la Agencia de Calidad Sanitaria de Andalucía permanecerán abiertos.');
