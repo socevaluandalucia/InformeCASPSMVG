@@ -548,6 +548,7 @@
     }
 
 
+
     .title-editor{
       display:grid;
       grid-template-columns:1fr;
@@ -1075,7 +1076,7 @@
     </div>
     <div class="app-header-center">
       <div class="app-header-title">Gestor de informes</div>
-      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v1.03</div>
+      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v1.05</div>
       <div class="app-header-subtitle">Centros de Atención Social a Personas con Problemas de Salud Mental<br>Comprometidos contra la Violencia de Género</div>
     </div>
     <div class="app-header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
@@ -1541,8 +1542,9 @@ function classifyEval(value='') {
   return value || '';
 }
 function hasFam(standard){
-  if ((standard.areasMejora||[]).length || (standard.fortalezas||[]).length) return true;
-  return (standard.eos||[]).some(eo => (eo.areasMejora||[]).length || (eo.fortalezas||[]).length);
+  const nonEmpty = arr => (arr||[]).some(x => String(x||'').trim());
+  if (nonEmpty(standard.areasMejora) || nonEmpty(standard.fortalezas)) return true;
+  return (standard.eos||[]).some(eo => nonEmpty(eo.areasMejora) || nonEmpty(eo.fortalezas));
 }
 function stdEvalFails(standard){
   return (standard.evaluation || '').toLowerCase().includes('no cumple');
@@ -2725,7 +2727,7 @@ async function generateCoverPdf() {
 
   const paragraphs = [
     `El centro ${pdfCenterTitle} inició la autoevaluación en ${startMonthYear}, según los estándares propuestos en el programa de certificación de “Centros de Atención Social a Personas con Problemas de Salud Mental Comprometidos contra la Violencia de Género” y tomando como referencia el “Manual de estándares de Centros de Atención Social a Personas con Problemas de Salud Mental Comprometidos contra la Violencia de Género”.`,
-    `Las personas responsables de la entidad relacionados con el proyecto son:`,
+    `Las personas responsables de la entidad relacionadas con el proyecto son:`,
     `Dirección Gerencia:`,
     `${centerManagement}`,
     `Responsable del centro para el seguimiento de la certificación:`,
@@ -3230,8 +3232,8 @@ async function generateCoverPdf() {
           justification: s.justification || ''
         });
       }
-      (s.areasMejora || []).forEach(x => allAreas.push(`${sLabel}: ${String(x || '').trim()}`));
-      (s.fortalezas || []).forEach(x => allStrengths.push(`${sLabel}: ${String(x || '').trim()}`));
+      (s.areasMejora || []).filter(x => String(x || '').trim()).forEach(x => allAreas.push(`${sLabel}: ${String(x || '').trim()}`));
+      (s.fortalezas || []).filter(x => String(x || '').trim()).forEach(x => allStrengths.push(`${sLabel}: ${String(x || '').trim()}`));
 
       (s.eos || []).forEach((eo) => {
         const eoLabel = eoCodeLabel(eo.code || '');
@@ -3242,8 +3244,8 @@ async function generateCoverPdf() {
             justification: eo.justification || ''
           });
         }
-        (eo.areasMejora || []).forEach(x => allAreas.push(`${eoLabel}: ${String(x || '').trim()}`));
-        (eo.fortalezas || []).forEach(x => allStrengths.push(`${eoLabel}: ${String(x || '').trim()}`));
+        (eo.areasMejora || []).filter(x => String(x || '').trim()).forEach(x => allAreas.push(`${eoLabel}: ${String(x || '').trim()}`));
+        (eo.fortalezas || []).filter(x => String(x || '').trim()).forEach(x => allStrengths.push(`${eoLabel}: ${String(x || '').trim()}`));
       });
     });
 
@@ -4022,12 +4024,12 @@ function renderEvaluationTable(item) {
 
 function renderSection(title, items=[], codePrefix='') {
   const key = title.toLowerCase().includes('fortaleza') ? 'fortalezas' : 'areasMejora';
+  const placeholderText = `No se han descrito ${title.toLowerCase()}.`;
+  const safeItems = items.length ? items : [''];
+  const listHtml = safeItems.map((x, idx) => `<textarea class="editable-list-item" data-section-key="${key}" data-parent-code="${escapeHtml(codePrefix || '')}" data-item-index="${idx}" placeholder="${escapeHtml(placeholderText)}">${escapeHtml(x)}</textarea>`).join('');
   return `
     <div class="section-title">${title}</div>
-    ${items.length
-      ? `<div class="editable-list">${items.map((x, idx) => `<textarea class="editable-list-item" data-section-key="${key}" data-parent-code="${escapeHtml(codePrefix || '')}" data-item-index="${idx}">${escapeHtml(x)}</textarea>`).join('')}</div>`
-      : `<div class="muted small">No se han descrito ${title.toLowerCase()}.</div>`
-    }
+    <div class="editable-list">${listHtml}</div>
   `;
 }
 
@@ -4047,23 +4049,35 @@ function updateArrayItemByCode(code, key, index, value) {
   const idx = Number(index);
   if (Number.isNaN(idx)) return false;
 
+  // target será el primer estándar o EO cuyo code coincide exactamente (sin permitir code vacío)
+  let target = null;
+  outer:
   for (const criterion of (currentData.criteria || [])) {
     for (const standard of (criterion.standards || [])) {
       if (String(standard.code || '') === String(code)) {
-        if (Array.isArray(standard[key]) && idx >= 0 && idx < standard[key].length) {
-          standard[key][idx] = value;
-          return true;
-        }
+        target = standard;
+        break outer;
       }
       for (const eo of (standard.eos || [])) {
         if (String(eo.code || '') === String(code)) {
-          if (Array.isArray(eo[key]) && idx >= 0 && idx < eo[key].length) {
-            eo[key][idx] = value;
-            return true;
-          }
+          target = eo;
+          break outer;
         }
       }
     }
+  }
+  if (!target) return false;
+
+  if (!Array.isArray(target[key])) target[key] = [];
+  if (idx >= 0 && idx < target[key].length) {
+    target[key][idx] = value;
+    return true;
+  }
+  if (idx === target[key].length) {
+    if (value && value.trim()) {
+      target[key].push(value);
+    }
+    return true;
   }
   return false;
 }
