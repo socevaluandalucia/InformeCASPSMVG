@@ -1076,7 +1076,7 @@
     </div>
     <div class="app-header-center">
       <div class="app-header-title">Gestor de informes</div>
-      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v1.05</div>
+      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v1.06</div>
       <div class="app-header-subtitle">Centros de Atención Social a Personas con Problemas de Salud Mental<br>Comprometidos contra la Violencia de Género</div>
     </div>
     <div class="app-header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
@@ -2479,15 +2479,30 @@ function formatSignatureDateSpanish(date=new Date()) {
 
 
 function toTitleCaseSpanish(text='') {
-  const lower = String(text || '').toLocaleLowerCase('es-ES').trim();
+  const original = String(text || '').trim();
   const smallWords = new Set(['de','del','la','las','el','los','y','e','a','en','por','para','con','sin','o','u']);
-  return lower
-    .split(/(\s+)/)
-    .map((token, index) => {
-      if (/^\s+$/.test(token)) return token;
-      const normalized = token.replace(/[.,;:()]/g, '');
-      if (index > 0 && smallWords.has(normalized)) return token;
-      return token.replace(/(^|[\-\/(])([a-záéíóúüñ])/g, (match, sep, ch) => sep + ch.toLocaleUpperCase('es-ES'));
+  let wordIndex = 0;
+  // Las siglas entre paréntesis (p.ej. "(SOAE)") se consideran acrónimos y se
+  // mantienen siempre en mayúsculas; el resto del texto se procesa en formato título.
+  const segments = original.split(/(\([^)]*\))/);
+  return segments
+    .map((segment) => {
+      if (/^\([^)]*\)$/.test(segment)) {
+        return segment.toLocaleUpperCase('es-ES');
+      }
+      const lower = segment.toLocaleLowerCase('es-ES');
+      return lower
+        .split(/(\s+)/)
+        .map((token) => {
+          if (token === '' || /^\s+$/.test(token)) return token;
+          const normalized = token.replace(/[.,;:]/g, '');
+          const isSmallWord = smallWords.has(normalized);
+          const currentIndex = wordIndex;
+          wordIndex++;
+          if (currentIndex > 0 && isSmallWord) return token;
+          return token.replace(/(^|[\-\/])([a-záéíóúüñ])/g, (match, sep, ch) => sep + ch.toLocaleUpperCase('es-ES'));
+        })
+        .join('');
     })
     .join('');
 }
