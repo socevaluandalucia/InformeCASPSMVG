@@ -126,7 +126,7 @@
     .phase-tab-seg:hover{background:#d3e8d8}
     .phase-tab-seg.active{background:#2e6b3e;color:#fff;border-color:#2e6b3e}
 
-    .radio-group{display:flex;flex-wrap:wrap;gap:18px;align-items:center}
+    .radio-group{display:flex;flex-wrap:wrap;gap:18px;align-items:center;margin-bottom:18px}
 
     .summary{padding:16px;margin-bottom:18px}
     .stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
@@ -1205,7 +1205,7 @@
     </div>
     <div class="app-header-center">
       <div class="app-header-title">Gestor de informes</div>
-      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v2.0</div>
+      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v2.2</div>
       <div class="app-header-subtitle">Centros de Atención Social a Personas con Problemas de Salud Mental<br>Comprometidos contra la Violencia de Género</div>
     </div>
     <div class="app-header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
@@ -1230,12 +1230,6 @@
           <span class="file-name" id="fileName">Sin archivo cargado</span>
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1;justify-content:flex-end;"><button id="historyBtn" class="btn-history" type="button">Historial de informes</button><button id="loadVersionBtn" class="btn-load-version" type="button">Importar proyecto</button><button id="saveVersionBtn" class="btn-save-version" type="button" disabled>Guardar proyecto</button><input id="loadVersionInput" type="file" accept=".json" hidden></div>
-      </div>
-
-      <div class="radio-group">
-        <label for="filterTodos"><input id="filterTodos" type="radio" name="filter" value="TODOS" checked onchange="applyCurrentFilter()"> Todos los estándares</label>
-        <label for="filterNoCumple"><input id="filterNoCumple" type="radio" name="filter" value="NOCUMPLE" onchange="applyCurrentFilter()"> Solo estándares que no se cumplen</label>
-        <label for="filterNoCumpleFam"><input id="filterNoCumpleFam" type="radio" name="filter" value="NOCUMPLE_FAM" onchange="applyCurrentFilter()"> Estándares que no se cumplen o con fortalezas y áreas de mejora</label>
       </div>
     </div>
 
@@ -1280,6 +1274,12 @@
 
       <div id="summary" class="summary" style="display:none"></div>
       <div id="highlightCriterionContainer" style="display:none"></div>
+
+      <div class="radio-group">
+        <label for="filterTodos"><input id="filterTodos" type="radio" name="filter" value="TODOS" checked onchange="applyCurrentFilter()"> Todos los estándares</label>
+        <label for="filterNoCumple"><input id="filterNoCumple" type="radio" name="filter" value="NOCUMPLE" onchange="applyCurrentFilter()"> Solo estándares que no se cumplen</label>
+        <label for="filterNoCumpleFam"><input id="filterNoCumpleFam" type="radio" name="filter" value="NOCUMPLE_FAM" onchange="applyCurrentFilter()"> Estándares que no se cumplen o con fortalezas y áreas de mejora</label>
+      </div>
 
       <div id="report" class="panel placeholder">
         <strong>Sin datos</strong><br>
