@@ -327,7 +327,7 @@
 
     .phase-locked{position:relative}
     .phase-locked::before{
-      content:'Fase de evaluación bloqueada: se ha iniciado el seguimiento del proyecto.';
+      content:'Fase de evaluación bloqueada: se ha iniciado la fase de estabilización del proyecto.';
       display:block;background:#fdecea;color:#a33a2e;border:1px solid #f3c3bb;
       border-radius:8px;padding:10px 14px;margin-bottom:14px;font-weight:600;font-size:14px;
     }
@@ -1051,6 +1051,33 @@
       opacity:.9;
     }
 
+    /* Botones de Cumple/No cumple/No aplica de la fase de estabilización.
+       Se usan botones explícitos en vez de un <select> personalizado porque
+       los <select> con appearance:none dan problemas de compatibilidad en
+       algunos navegadores/móviles. */
+    .seg-eval-btn-group{
+      display:flex;
+      flex-wrap:wrap;
+      gap:4px;
+    }
+    .seg-eval-btn{
+      border:1.5px solid #ccc;
+      background:#fff;
+      color:#444;
+      font-weight:700;
+      font-size:12.5px;
+      padding:6px 10px;
+      border-radius:999px;
+      cursor:pointer;
+      transition:background .12s ease,color .12s ease,border-color .12s ease;
+    }
+    .seg-eval-btn:hover{background:#f1f1ee}
+    .seg-eval-btn.active{color:#fff;border-color:transparent}
+    .seg-eval-btn.active.status-cumple{background:#2e7d32}
+    .seg-eval-btn.active.status-nocumple{background:#c62828}
+    .seg-eval-btn.active.status-noaplica{background:#111}
+    .phase-locked .seg-eval-btn{cursor:not-allowed}
+
     .evaluation-select,
     .seg-evaluation-select{
       width:100%;
@@ -1205,7 +1232,7 @@
     </div>
     <div class="app-header-center">
       <div class="app-header-title">Gestor de informes</div>
-      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v2.2</div>
+      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v2.6</div>
       <div class="app-header-subtitle">Centros de Atención Social a Personas con Problemas de Salud Mental<br>Comprometidos contra la Violencia de Género</div>
     </div>
     <div class="app-header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
@@ -1260,14 +1287,14 @@
 
     <div class="phase-tabs">
       <button type="button" id="phaseTabBtnEvaluacion" class="phase-tab phase-tab-eval active" onclick="switchPhaseTab('evaluacion')">Fase de evaluación</button>
-      <button type="button" id="phaseTabBtnSeguimiento" class="phase-tab phase-tab-seg" onclick="switchPhaseTab('seguimiento')">Fase de seguimiento</button>
+      <button type="button" id="phaseTabBtnSeguimiento" class="phase-tab phase-tab-seg" onclick="switchPhaseTab('seguimiento')">Fase de estabilización</button>
     </div>
 
     <div id="phaseTabEvaluacion" class="phase-tab-panel active">
       <div class="row" style="justify-content:flex-end;gap:10px;margin-bottom:14px;">
         <button id="generatePdfBtn" class="btn-generate" type="button" disabled>Generar Informe de Evaluación</button>
-        <button id="startSeguimientoBtn" class="btn-start-seguimiento" type="button" disabled onclick="startSeguimientoPhase()">Comenzar fase de seguimiento</button>
-        <button id="seguimientoActiveBtn" class="btn-seguimiento-active" type="button" disabled style="display:none;">Seguimiento en curso</button>
+        <button id="startSeguimientoBtn" class="btn-start-seguimiento" type="button" disabled onclick="startSeguimientoPhase()">Comenzar fase de estabilización</button>
+        <button id="seguimientoActiveBtn" class="btn-seguimiento-active" type="button" disabled style="display:none;">Estabilización en curso</button>
       </div>
 
       <div id="outcomeStatus" class="outcome-status" style="display:none"></div>
@@ -1289,8 +1316,8 @@
 
     <div id="phaseTabSeguimiento" class="phase-tab-panel">
       <div class="phase-placeholder">
-        <strong>Fase de seguimiento</strong><br>
-        Este apartado está en construcción. Próximamente podrás gestionar aquí el seguimiento del proyecto.
+        <strong>Fase de estabilización</strong><br>
+        Este apartado está en construcción. Próximamente podrás gestionar aquí la estabilización del proyecto.
       </div>
     </div>
   </div>
@@ -1991,7 +2018,7 @@ function downloadVersionPayload(payload) {
     .replace(/_+/g, '_')
     .replace(/^_+|_+$/g, '');
 
-  const seguimientoSuffix = payload.seguimientoActive ? '_seguimiento' : '';
+  const seguimientoSuffix = payload.seguimientoActive ? '_estabilizacion' : '';
 
   a.href = url;
   a.download = `${safeProject || 'proyecto'}${seguimientoSuffix}.json`;
@@ -3560,7 +3587,11 @@ async function generateCoverPdf(mode = 'evaluacion', seguimientoContext = null) 
       .trim()
       .toUpperCase();
     const selectedCriterionColor = criterionColor(selectedCriterionCode);
-    const criterionLogo = bundledPngLogoData(`pdfLogoCriterio${selectedCriterionCode}`);
+    const criterionLogoNumber = (String(selectedCriterionCode || '').match(/(\d+)/) || [])[1] || selectedCriterionCode;
+    const criterionLogo = bundledPngLogoData(`pdfLogoCriterio${criterionLogoNumber}`);
+    if (!criterionLogo) {
+      console.warn('Criterio destacado: no se encontró el logo para "pdfLogoCriterio' + criterionLogoNumber + '" (código original:', selectedCriterionCode, ')');
+    }
 
     reportPageNumber += 1;
     doc.addPage();
@@ -3575,21 +3606,26 @@ async function generateCoverPdf(mode = 'evaluacion', seguimientoContext = null) 
     const textLines = doc.splitTextToSize(text, pageW - margin * 2);
     doc.text(textLines, margin, textY);
 
-    if (criterionLogo) {
-      const fitHighlighted = fitBox(criterionLogo.width, criterionLogo.height, 100, 125);
-      const logoX = (pageW - fitHighlighted.w) / 2;
-      const logoY = textY + textLines.length * 4.6 + 30;
-      doc.addImage(criterionLogo.dataUrl, 'JPEG', logoX, logoY, fitHighlighted.w, fitHighlighted.h);
+    const logoBoxH = 125;
+    let logoY = textY + textLines.length * 4.6 + 30;
 
-      doc.setFont('times', 'bold');
-      doc.setFontSize(24);
-      doc.setTextColor(...selectedCriterionColor);
-      const highlightedTitleLines = doc.splitTextToSize(selectedCriterionName, 150);
-      doc.text(highlightedTitleLines, pageW / 2, logoY + fitHighlighted.h + 20, {
-        align: 'center',
-        baseline: 'top'
-      });
+    if (criterionLogo) {
+      const fitHighlighted = fitBox(criterionLogo.width, criterionLogo.height, 100, logoBoxH);
+      const logoX = (pageW - fitHighlighted.w) / 2;
+      doc.addImage(criterionLogo.dataUrl, 'JPEG', logoX, logoY, fitHighlighted.w, fitHighlighted.h);
+      logoY += fitHighlighted.h;
+    } else {
+      logoY += 10;
     }
+
+    doc.setFont('times', 'bold');
+    doc.setFontSize(24);
+    doc.setTextColor(...selectedCriterionColor);
+    const highlightedTitleLines = doc.splitTextToSize(selectedCriterionName, 150);
+    doc.text(highlightedTitleLines, pageW / 2, logoY + 20, {
+      align: 'center',
+      baseline: 'top'
+    });
   }
 
   addHighlightedCriterionPage();
@@ -3696,7 +3732,7 @@ async function generateCoverPdf(mode = 'evaluacion', seguimientoContext = null) 
     .toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-  doc.save(`informe_${isSeguimiento ? 'seguimiento' : 'evaluacion'}_${safeName || 'caspsmcv'}.pdf`);
+  doc.save(`informe_${isSeguimiento ? 'estabilizacion' : 'evaluacion'}_${safeName || 'caspsmcv'}.pdf`);
 }
 
 function switchPhaseTab(tab) {
@@ -4196,6 +4232,20 @@ function renderStandard(s) {
 
 
 /* ================== FASE DE SEGUIMIENTO ================== */
+/*
+ * AVISO IMPORTANTE (naming): esta sección implementa lo que en la interfaz se
+ * muestra como "Fase de estabilización" (renombrada desde "Fase de seguimiento").
+ * Por motivos de riesgo/tiempo, TODO el código interno (funciones, variables,
+ * clases CSS .seg-*, ids #phaseTabSeguimiento/#seguimiento*, claves del JSON
+ * guardado como seguimientoActive/seguimientoCriteria, etc.) sigue usando el
+ * nombre "seguimiento" — SOLO cambiaron los textos visibles para el usuario.
+ *
+ * Si en el futuro se desarrolla una fase de seguimiento REAL y distinta de la
+ * estabilización, NO reutilizar estos identificadores: usar un prefijo nuevo
+ * (ej. "estabilizacion" para esta fase, dejando "seguimiento" libre para la
+ * futura), o renombrar primero todo lo de aquí a "estabilizacion" antes de
+ * añadir la fase de seguimiento de verdad, para evitar colisiones y confusión.
+ */
 
 function eoEvalFails(eo) {
   return String(eo?.evaluation || '').toLowerCase().includes('no cumple');
@@ -4308,7 +4358,7 @@ async function generateSeguimientoPdf() {
     await ensureRequiredLibraries();
     await generateCoverPdf('seguimiento', { originalFailedEssentialCodesText });
   } catch (err) {
-    alert('No se pudo generar el PDF de seguimiento: ' + (err.message || err));
+    alert('No se pudo generar el PDF de estabilización: ' + (err.message || err));
   } finally {
     currentData.criteria = originalCriteria;
     currentData.evaluationOutcome = originalOutcome;
@@ -4436,6 +4486,24 @@ function handleSeguimientoEvaluationSelectChange(sel) {
   refreshSeguimientoTopSections();
 }
 
+function handleSeguimientoEvaluationButtonClick(btn) {
+  if (!btn) return;
+  const group = btn.closest('.seg-eval-btn-group');
+  const code = (group && group.getAttribute('data-code')) || '';
+  const value = String(btn.getAttribute('data-value') || 'Cumple');
+
+  updateSeguimientoEvaluationByCode(code, value);
+
+  if (group) {
+    group.querySelectorAll('.seg-eval-btn').forEach((b) => {
+      b.classList.remove('active', 'status-cumple', 'status-nocumple', 'status-noaplica');
+    });
+    btn.classList.add('active', evaluationOptionClass(value));
+  }
+
+  refreshSeguimientoTopSections();
+}
+
 function renderSeguimientoReference(item) {
   const am = (item.refAreasMejora || []).filter(x => String(x || '').trim());
   const fz = (item.refFortalezas || []).filter(x => String(x || '').trim());
@@ -4469,24 +4537,22 @@ function renderSeguimientoEvaluationTable(item) {
           <textarea
             class="seg-autoeval-input"
             data-code="${escapeHtml(item.trackId || '')}"
-            placeholder="Autoevaluación del centro en el seguimiento"
+            placeholder="Autoevaluación del centro en la estabilización"
             rows="2"
           >${escapeHtml(item.autoevaluacion || '')}</textarea>
         </td>
         <td>
-          <div class="evaluation-pill ${evaluationOptionClass(evalValue)}">
-            <select class="seg-evaluation-select" data-code="${escapeHtml(item.trackId || '')}" onchange="handleSeguimientoEvaluationSelectChange(this)" oninput="handleSeguimientoEvaluationSelectChange(this)">
-              <option value="Cumple" ${evalValue === 'Cumple' ? 'selected' : ''}>Cumple</option>
-              <option value="No cumple" ${evalValue === 'No cumple' ? 'selected' : ''}>No cumple</option>
-              <option value="No aplica" ${evalValue === 'No aplica' ? 'selected' : ''}>No aplica</option>
-            </select>
+          <div class="seg-eval-btn-group" data-code="${escapeHtml(item.trackId || '')}">
+            <button type="button" class="seg-eval-btn ${evalValue === 'Cumple' ? 'active status-cumple' : ''}" data-value="Cumple" onclick="handleSeguimientoEvaluationButtonClick(this)">Cumple</button>
+            <button type="button" class="seg-eval-btn ${evalValue === 'No cumple' ? 'active status-nocumple' : ''}" data-value="No cumple" onclick="handleSeguimientoEvaluationButtonClick(this)">No cumple</button>
+            <button type="button" class="seg-eval-btn ${evalValue === 'No aplica' ? 'active status-noaplica' : ''}" data-value="No aplica" onclick="handleSeguimientoEvaluationButtonClick(this)">No aplica</button>
           </div>
         </td>
         <td>
           <textarea
             class="seg-justification-input"
             data-code="${escapeHtml(item.trackId || '')}"
-            placeholder="Editar justificación del seguimiento"
+            placeholder="Editar justificación de la estabilización"
             rows="2"
           >${escapeHtml(item.justification || '')}</textarea>
         </td>
@@ -4566,8 +4632,8 @@ function renderSeguimientoPanel() {
   if (!currentData || !currentData.seguimientoActive) {
     container.innerHTML = `
       <div class="phase-placeholder">
-        <strong>Fase de seguimiento</strong><br>
-        Todavía no se ha iniciado el seguimiento de este proyecto. Pulsa «Comenzar fase de seguimiento» en la pestaña Fase de evaluación cuando el informe de evaluación esté finalizado.
+        <strong>Fase de estabilización</strong><br>
+        Todavía no se ha iniciado la fase de estabilización de este proyecto. Pulsa «Comenzar fase de estabilización» en la pestaña Fase de evaluación cuando el informe de evaluación esté finalizado.
       </div>
     `;
     return;
@@ -4578,7 +4644,7 @@ function renderSeguimientoPanel() {
     container.innerHTML = `
       <div class="phase-placeholder">
         <strong>Sin estándares pendientes</strong><br>
-        No hay estándares esenciales que no cumplan en la evaluación, por lo que no hay elementos que requieran seguimiento.
+        No hay estándares esenciales que no cumplan en la evaluación, por lo que no hay elementos que requieran estabilización.
       </div>
     `;
     return;
@@ -4597,9 +4663,9 @@ function renderSeguimientoPanel() {
 
   container.innerHTML = `
     <div class="row" style="justify-content:flex-end;margin-bottom:14px;">
-      <button id="generateSeguimientoPdfBtn" class="btn-generate-seguimiento" type="button" onclick="generateSeguimientoPdf()">Generar Informe de Seguimiento</button>
+      <button id="generateSeguimientoPdfBtn" class="btn-generate-seguimiento" type="button" onclick="generateSeguimientoPdf()">Generar Informe de Estabilización</button>
     </div>
-    <div class="seg-header-note">Seguimiento iniciado${startedText ? ': ' + escapeHtml(startedText) : ''}. Se muestran únicamente los estándares esenciales que no cumplían en la evaluación.</div>
+    <div class="seg-header-note">Estabilización iniciada${startedText ? ': ' + escapeHtml(startedText) : ''}. Se muestran únicamente los estándares esenciales que no cumplían en la evaluación.</div>
     <div id="seguimientoTopSections">${renderSeguimientoResumenBox()}${renderSeguimientoHighlightedCriterionBox()}</div>
     ${html}
   `;
@@ -4633,7 +4699,7 @@ function renderSeguimientoResumenBox() {
 
   return `
     <div class="outcome-card">
-      <div class="outcome-label">Resumen del proceso de seguimiento</div>
+      <div class="outcome-label">Resumen del proceso de estabilización</div>
       <div class="outcome-row">
         <div class="outcome-select ${outcomeOptionClass(outcome)}" style="pointer-events:none;display:inline-flex;align-items:center;">${escapeHtml(outcome)}</div>
         <div class="outcome-meta">${messages.join('<br>')}</div>
@@ -4686,7 +4752,7 @@ function renderSeguimientoHighlightedCriterionBox() {
         <div class="highlight-criterion-row">
           <label>Criterio destacado</label>
         </div>
-        <div class="highlight-criterion-help">Como existen estándares esenciales no cumplidos en el seguimiento, no se selecciona un criterio destacado.</div>
+        <div class="highlight-criterion-help">Como existen estándares esenciales no cumplidos en la estabilización, no se selecciona un criterio destacado.</div>
       </div>
     `;
   }
@@ -4760,7 +4826,7 @@ function customConfirm(message) {
 async function startSeguimientoPhase() {
   if (!currentData || !currentData.criteria || !currentData.criteria.length) return;
   if (currentData.seguimientoActive) return;
-  const ok = await customConfirm('Al comenzar la fase de seguimiento, el contenido de la Fase de evaluación quedará bloqueado y ya no podrás generar el Informe de Evaluación ni editar sus datos. Se copiarán a la Fase de seguimiento los estándares esenciales que no cumplían. ¿Deseas continuar?');
+  const ok = await customConfirm('Al comenzar la fase de estabilización, el contenido de la Fase de evaluación quedará bloqueado y ya no podrás generar el Informe de Evaluación ni editar sus datos. Se copiarán a la Fase de estabilización los estándares esenciales que no cumplían. ¿Deseas continuar?');
   if (!ok) return;
 
   currentData.seguimientoCriteria = buildSeguimientoCriteria(currentData.criteria);
