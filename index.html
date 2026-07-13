@@ -1232,7 +1232,7 @@
     </div>
     <div class="app-header-center">
       <div class="app-header-title">Gestor de informes</div>
-      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v2.6</div>
+      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v2.7</div>
       <div class="app-header-subtitle">Centros de Atención Social a Personas con Problemas de Salud Mental<br>Comprometidos contra la Violencia de Género</div>
     </div>
     <div class="app-header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
@@ -2699,6 +2699,10 @@ function centroPhrase(article, name) {
 function toTitleCaseSpanish(text='') {
   const original = String(text || '').trim();
   const smallWords = new Set(['de','del','la','las','el','los','y','e','a','en','por','para','con','sin','o','u']);
+  // Siglas/acrónimos conocidos que deben mantenerse siempre en mayúsculas aunque
+  // no vayan entre paréntesis (además de las que sí van entre paréntesis, que se
+  // detectan automáticamente más abajo). Añadir aquí cualquier otro que aparezca.
+  const knownAcronyms = new Set(['FAISEM']);
   let wordIndex = 0;
   // Las siglas entre paréntesis (p.ej. "(SOAE)") se consideran acrónimos y se
   // mantienen siempre en mayúsculas; el resto del texto se procesa en formato título.
@@ -2717,6 +2721,9 @@ function toTitleCaseSpanish(text='') {
           const isSmallWord = smallWords.has(normalized);
           const currentIndex = wordIndex;
           wordIndex++;
+          if (knownAcronyms.has(normalized.toLocaleUpperCase('es-ES'))) {
+            return token.toLocaleUpperCase('es-ES');
+          }
           if (currentIndex > 0 && isSmallWord) return token;
           return token.replace(/(^|[\-\/])([a-záéíóúüñ])/g, (match, sep, ch) => sep + ch.toLocaleUpperCase('es-ES'));
         })
