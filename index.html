@@ -1232,7 +1232,7 @@
     </div>
     <div class="app-header-center">
       <div class="app-header-title">Gestor de informes</div>
-      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v2.7</div>
+      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v2.8</div>
       <div class="app-header-subtitle">Centros de Atención Social a Personas con Problemas de Salud Mental<br>Comprometidos contra la Violencia de Género</div>
     </div>
     <div class="app-header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
@@ -2979,7 +2979,12 @@ async function generateCoverPdf(mode = 'evaluacion', seguimientoContext = null) 
 
   const externalVisitParagraphs = isSeguimiento
     ? [
-        `Finalizada la autoevaluación, se realiza la visita de evaluación externa al centro el ${fullExternalDate}. Al no cumplir los estándares esenciales ${seguimientoContext?.originalFailedEssentialCodesText || 'indicados en el informe de evaluación'} el centro queda en situación de pendiente de estándares.`,
+        (() => {
+          const n = Number(seguimientoContext?.originalFailedEssentialCount || 0);
+          const codesText = seguimientoContext?.originalFailedEssentialCodesText || 'indicados en el informe de evaluación';
+          const label = n === 1 ? 'el estándar esencial' : 'los estándares esenciales';
+          return `Finalizada la autoevaluación, se realiza la visita de evaluación externa al centro el ${fullExternalDate}. Al no cumplir ${label} ${codesText} el centro queda en situación de pendiente de estándares.`;
+        })(),
         `Desde la comunicación del resultado, el centro cuenta con un nuevo periodo de 60 días para dar respuesta a los estándares que no han superado la evaluación, obligatoriamente en los estándares esenciales y de forma opcional los estándares no esenciales no cumplidos.`
       ]
     : [
@@ -3605,19 +3610,45 @@ async function generateCoverPdf(mode = 'evaluacion', seguimientoContext = null) 
     drawReportHeaderFooter();
 
     const text = `Por cumplirse todos los estándares esenciales y sumar el mayor número de fortalezas, ${centroPhrase('el', pdfCenterTitle)} destaca en el criterio:`;
-    const textY = 62;
+
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(9.5);
+    const textLines = doc.splitTextToSize(text, pageW - margin * 2);
+    const textLineHeight = 4.6;
+    const textBlockH = textLines.length * textLineHeight;
+
+    const gapTextToLogo = 30;
+    const logoBoxH = 125;
+    let logoH = 0;
+    let fitHighlighted = null;
+    if (criterionLogo) {
+      fitHighlighted = fitBox(criterionLogo.width, criterionLogo.height, 100, logoBoxH);
+      logoH = fitHighlighted.h;
+    }
+    const gapLogoToTitle = criterionLogo ? 20 : 10;
+
+    doc.setFont('times', 'bold');
+    doc.setFontSize(24);
+    const highlightedTitleLines = doc.splitTextToSize(selectedCriterionName, 150);
+    const titleLineHeight = 10.5;
+    const titleBlockH = highlightedTitleLines.length * titleLineHeight;
+
+    // Centrar todo el bloque (texto + logo + nombre) en el área útil de la página
+    // (entre la cabecera y el pie), en vez de anclarlo a un margen superior fijo.
+    const contentTop = 34;
+    const contentBottom = pageH - 26;
+    const totalBlockH = textBlockH + gapTextToLogo + logoH + gapLogoToTitle + titleBlockH;
+    const availableH = contentBottom - contentTop;
+    const textY = contentTop + Math.max(0, (availableH - totalBlockH) / 2) + textLineHeight;
 
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(9.5);
     doc.setTextColor(0, 0, 0);
-    const textLines = doc.splitTextToSize(text, pageW - margin * 2);
     doc.text(textLines, margin, textY);
 
-    const logoBoxH = 125;
-    let logoY = textY + textLines.length * 4.6 + 30;
+    let logoY = textY + (textLines.length - 1) * textLineHeight + gapTextToLogo;
 
-    if (criterionLogo) {
-      const fitHighlighted = fitBox(criterionLogo.width, criterionLogo.height, 100, logoBoxH);
+    if (criterionLogo && fitHighlighted) {
       const logoX = (pageW - fitHighlighted.w) / 2;
       doc.addImage(criterionLogo.dataUrl, 'JPEG', logoX, logoY, fitHighlighted.w, fitHighlighted.h);
       logoY += fitHighlighted.h;
@@ -3628,8 +3659,7 @@ async function generateCoverPdf(mode = 'evaluacion', seguimientoContext = null) 
     doc.setFont('times', 'bold');
     doc.setFontSize(24);
     doc.setTextColor(...selectedCriterionColor);
-    const highlightedTitleLines = doc.splitTextToSize(selectedCriterionName, 150);
-    doc.text(highlightedTitleLines, pageW / 2, logoY + 20, {
+    doc.text(highlightedTitleLines, pageW / 2, logoY + gapLogoToTitle, {
       align: 'center',
       baseline: 'top'
     });
@@ -4294,7 +4324,7 @@ function formatEssentialCodesList(codes) {
 }
 
 // Construye, a partir de los criterios de evaluación, la estructura de seguimiento:
-// copia los estándares esenciales que no cumplían (con sus elementos orientativos),
+// copia todos los estándares que no cumplían (esenciales o no, con sus elementos orientativos),
 // con el contenido de la evaluación (autoevaluación, evaluación, justificación,
 // áreas de mejora, fortalezas) copiado literalmente como punto de partida, para
 // que se puedan ir actualizando durante el seguimiento.
@@ -4346,6 +4376,7 @@ async function generateSeguimientoPdf() {
 
   const originalStats = computeSummaryStats(currentData);
   const originalFailedEssentialCodesText = formatEssentialCodesNumbersOnly(originalStats.noCumplenEsencialesCodes) || 'indicados en el informe de evaluación';
+  const originalFailedEssentialCount = originalStats.noCumplenEsenciales;
 
   const originalCriteria = currentData.criteria;
   const originalOutcome = currentData.evaluationOutcome;
@@ -4363,7 +4394,7 @@ async function generateSeguimientoPdf() {
     currentData.highlightedCriterionManual = !!currentData.seguimientoHighlightedCriterionManual;
 
     await ensureRequiredLibraries();
-    await generateCoverPdf('seguimiento', { originalFailedEssentialCodesText });
+    await generateCoverPdf('seguimiento', { originalFailedEssentialCodesText, originalFailedEssentialCount });
   } catch (err) {
     alert('No se pudo generar el PDF de estabilización: ' + (err.message || err));
   } finally {
@@ -4375,13 +4406,17 @@ async function generateSeguimientoPdf() {
   }
 }
 
+// Construye, a partir de los criterios de evaluación, la estructura de estabilización:
+// copia TODOS los estándares (esenciales o no) que no cumplían, con el contenido
+// de la evaluación copiado literalmente como punto de partida, para que se puedan
+// ir actualizando durante la estabilización.
 function buildSeguimientoCriteria(criteria) {
   const result = [];
   let counter = 0;
   (criteria || []).forEach(c => {
     const standards = [];
     (c.standards || []).forEach(s => {
-      if (!isEssentialStandard(s) || !stdEvalFails(s)) return;
+      if (!stdEvalFails(s)) return;
       counter++;
       const stdTrackId = 'SEG::S' + counter;
       const eos = (s.eos || [])
@@ -4651,7 +4686,7 @@ function renderSeguimientoPanel() {
     container.innerHTML = `
       <div class="phase-placeholder">
         <strong>Sin estándares pendientes</strong><br>
-        No hay estándares esenciales que no cumplan en la evaluación, por lo que no hay elementos que requieran estabilización.
+        No hay estándares que no cumplan en la evaluación, por lo que no hay elementos que requieran estabilización.
       </div>
     `;
     return;
@@ -4672,7 +4707,7 @@ function renderSeguimientoPanel() {
     <div class="row" style="justify-content:flex-end;margin-bottom:14px;">
       <button id="generateSeguimientoPdfBtn" class="btn-generate-seguimiento" type="button" onclick="generateSeguimientoPdf()">Generar Informe de Estabilización</button>
     </div>
-    <div class="seg-header-note">Estabilización iniciada${startedText ? ': ' + escapeHtml(startedText) : ''}. Se muestran únicamente los estándares esenciales que no cumplían en la evaluación.</div>
+    <div class="seg-header-note">Estabilización iniciada${startedText ? ': ' + escapeHtml(startedText) : ''}. Se muestran únicamente los estándares que no cumplían en la evaluación.</div>
     <div id="seguimientoTopSections">${renderSeguimientoResumenBox()}${renderSeguimientoHighlightedCriterionBox()}</div>
     ${html}
   `;
@@ -4833,7 +4868,7 @@ function customConfirm(message) {
 async function startSeguimientoPhase() {
   if (!currentData || !currentData.criteria || !currentData.criteria.length) return;
   if (currentData.seguimientoActive) return;
-  const ok = await customConfirm('Al comenzar la fase de estabilización, el contenido de la Fase de evaluación quedará bloqueado y ya no podrás generar el Informe de Evaluación ni editar sus datos. Se copiarán a la Fase de estabilización los estándares esenciales que no cumplían. ¿Deseas continuar?');
+  const ok = await customConfirm('Al comenzar la fase de estabilización, el contenido de la Fase de evaluación quedará bloqueado y ya no podrás generar el Informe de Evaluación ni editar sus datos. Se copiarán a la Fase de estabilización todos los estándares que no cumplían. ¿Deseas continuar?');
   if (!ok) return;
 
   currentData.seguimientoCriteria = buildSeguimientoCriteria(currentData.criteria);
