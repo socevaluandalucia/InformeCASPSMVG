@@ -1185,6 +1185,50 @@
     .custom-confirm-cancel:hover{background:#e6e6e2}
     .custom-confirm-ok{background:#2e6b3e;color:#fff}
     .custom-confirm-ok:hover{background:#255a33}
+    .doc-convert-help{
+      position:relative;
+      align-self:center;
+      font-size:12.5px;
+    }
+    .doc-convert-help summary{
+      cursor:pointer;
+      color:#7641a2;
+      font-weight:600;
+      list-style:none;
+      text-decoration:underline;
+      text-underline-offset:2px;
+      white-space:nowrap;
+    }
+    .doc-convert-help summary::-webkit-details-marker{display:none}
+    .doc-convert-help-panel{
+      position:absolute;
+      z-index:50;
+      top:calc(100% + 6px);
+      left:0;
+      width:320px;
+      max-width:80vw;
+      background:#fff;
+      border:1px solid var(--borde);
+      border-radius:12px;
+      box-shadow:0 10px 30px rgba(0,0,0,.15);
+      padding:14px;
+      font-size:12.5px;
+      line-height:1.4;
+      color:#444;
+    }
+    .doc-convert-help-panel p{margin:0 0 8px}
+    .doc-convert-help-panel a{color:#7641a2}
+    .btn-doc-convert{
+      border:1px solid #7641a2;
+      background:#fff;
+      color:#7641a2;
+      font-weight:700;
+      font-size:12px;
+      padding:7px 10px;
+      border-radius:8px;
+      cursor:pointer;
+    }
+    .btn-doc-convert:hover{background:#f4ecfb}
 </style>
 </head>
 <body class="locked">
@@ -1232,7 +1276,7 @@
     </div>
     <div class="app-header-center">
       <div class="app-header-title">Gestor de informes</div>
-      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v2.8</div>
+      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v2.9</div>
       <div class="app-header-subtitle">Centros de Atención Social a Personas con Problemas de Salud Mental<br>Comprometidos contra la Violencia de Género</div>
     </div>
     <div class="app-header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
@@ -1255,6 +1299,17 @@
           <label class="btn" style="text-align:center; line-height:1.2;" for="fileInput"><span>Importar</span><br><span>archivo WORD</span></label>
           <input id="fileInput" type="file" accept=".doc,.docx" hidden />
           <span class="file-name" id="fileName">Sin archivo cargado</span>
+          <details class="doc-convert-help">
+            <summary>¿Problemas con un .doc?</summary>
+            <div class="doc-convert-help-panel">
+              <p>Si un archivo <strong>.doc</strong> (formato antiguo de Word) da problemas al importarlo, suele deberse a cómo se convirtió a .docx manualmente. Estos scripts lo convierten automáticamente usando <strong>LibreOffice</strong> (gratis, hay que tenerlo instalado: <a href="https://es.libreoffice.org/descarga/libreoffice/" target="_blank" rel="noopener">descargar aquí</a>).</p>
+              <p>Descarga el script para tu sistema y arrastra los archivos .doc encima (o ejecútalo dentro de la carpeta que los contiene):</p>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="btn-doc-convert" onclick="downloadDocConvertScript('windows')">Script para Windows (.bat)</button>
+                <button type="button" class="btn-doc-convert" onclick="downloadDocConvertScript('mac')">Script para Mac / Linux (.sh)</button>
+              </div>
+            </div>
+          </details>
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1;justify-content:flex-end;"><button id="historyBtn" class="btn-history" type="button">Historial de informes</button><button id="loadVersionBtn" class="btn-load-version" type="button">Importar proyecto</button><button id="saveVersionBtn" class="btn-save-version" type="button" disabled>Guardar proyecto</button><input id="loadVersionInput" type="file" accept=".json" hidden></div>
       </div>
@@ -1997,6 +2052,114 @@ function applyVersionPayload(payload) {
       document.getElementById('report').innerHTML = '<strong>Informe cargado</strong><br>Puedes revisar o corregir el centro y el código antes de generar el PDF.';
     }
   }, 10);
+}
+
+// Descarga un script de ayuda (Windows .bat o Mac/Linux .sh) que convierte
+// archivos .doc a .docx automáticamente usando LibreOffice, arrastrando los
+// archivos encima del script. No se ejecuta nada desde el navegador: es un
+// archivo independiente que el usuario descarga y usa fuera de la app.
+function downloadDocConvertScript(target) {
+  const isWindows = target === 'windows';
+
+  const batScript = `@echo off
+setlocal enabledelayedexpansion
+title Convertir .doc a .docx (CASPSMCV)
+
+set "SOFFICE=soffice"
+where soffice >nul 2>nul
+if errorlevel 1 (
+    if exist "C:\\Program Files\\LibreOffice\\program\\soffice.exe" (
+        set "SOFFICE=C:\\Program Files\\LibreOffice\\program\\soffice.exe"
+    ) else if exist "C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe" (
+        set "SOFFICE=C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe"
+    ) else (
+        echo No se ha encontrado LibreOffice instalado en este ordenador.
+        echo Descargalo gratis desde https://es.libreoffice.org/descarga/libreoffice/
+        echo y vuelve a ejecutar este script.
+        pause
+        exit /b 1
+    )
+)
+
+if "%~1"=="" (
+    echo No se ha arrastrado ningun archivo sobre este script.
+    echo.
+    set /p CONFIRM="Quieres convertir todos los .doc de esta misma carpeta? (S/N): "
+    if /i "!CONFIRM!"=="S" (
+        for %%f in (*.doc) do (
+            echo Convirtiendo: %%f
+            "!SOFFICE!" --headless --convert-to docx "%%f" >nul 2>nul
+        )
+    ) else (
+        echo Nada que hacer. Arrastra uno o varios .doc sobre este script para convertirlos.
+        pause
+        exit /b 0
+    )
+) else (
+    for %%f in (%*) do (
+        echo Convirtiendo: %%f
+        "!SOFFICE!" --headless --convert-to docx "%%f" >nul 2>nul
+    )
+)
+
+echo.
+echo Listo. Los archivos .docx se han creado en la misma carpeta que los .doc originales.
+pause
+`;
+
+  const shScript = `#!/bin/bash
+# Convierte archivos .doc a .docx automaticamente usando LibreOffice (CASPSMCV)
+
+SOFFICE=""
+if command -v soffice >/dev/null 2>&1; then
+    SOFFICE="soffice"
+elif [ -f "/Applications/LibreOffice.app/Contents/MacOS/soffice" ]; then
+    SOFFICE="/Applications/LibreOffice.app/Contents/MacOS/soffice"
+else
+    echo "No se ha encontrado LibreOffice instalado en este ordenador."
+    echo "Descargalo gratis desde https://es.libreoffice.org/descarga/libreoffice/"
+    echo "y vuelve a ejecutar este script."
+    exit 1
+fi
+
+if [ "$#" -eq 0 ]; then
+    echo "No se ha arrastrado ningun archivo sobre este script."
+    echo ""
+    read -p "Quieres convertir todos los .doc de esta misma carpeta? (s/n): " CONFIRM
+    if [[ "$CONFIRM" == "s" || "$CONFIRM" == "S" ]]; then
+        shopt -s nullglob
+        for f in *.doc; do
+            echo "Convirtiendo: $f"
+            "$SOFFICE" --headless --convert-to docx "$f" >/dev/null 2>&1
+        done
+    else
+        echo "Nada que hacer. Arrastra uno o varios .doc sobre este script para convertirlos."
+        exit 0
+    fi
+else
+    for f in "$@"; do
+        echo "Convirtiendo: $f"
+        "$SOFFICE" --headless --convert-to docx "$f" >/dev/null 2>&1
+    done
+fi
+
+echo ""
+echo "Listo. Los archivos .docx se han creado en la misma carpeta que los .doc originales."
+read -p "Pulsa Enter para salir..."
+`;
+
+  const content = isWindows ? batScript.replace(/\n/g, '\r\n') : shScript;
+  const filename = isWindows ? 'convertir_doc_a_docx.bat' : 'convertir_doc_a_docx.sh';
+
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function downloadVersionPayload(payload) {
