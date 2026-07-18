@@ -1276,7 +1276,7 @@
     </div>
     <div class="app-header-center">
       <div class="app-header-title">Gestor de informes</div>
-      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v2.9</div>
+      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v3.0</div>
       <div class="app-header-subtitle">Centros de Atención Social a Personas con Problemas de Salud Mental<br>Comprometidos contra la Violencia de Género</div>
     </div>
     <div class="app-header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
@@ -4570,16 +4570,17 @@ async function generateSeguimientoPdf() {
 }
 
 // Construye, a partir de los criterios de evaluación, la estructura de estabilización:
-// copia TODOS los estándares (esenciales o no) que no cumplían, con el contenido
-// de la evaluación copiado literalmente como punto de partida, para que se puedan
-// ir actualizando durante la estabilización.
+// copia TODOS los estándares (esenciales o no) que no cumplían, y también los que
+// SÍ cumplían pero tienen algún Elemento Orientativo que no cumple, con el
+// contenido de la evaluación copiado literalmente como punto de partida, para que
+// se puedan ir actualizando durante la estabilización.
 function buildSeguimientoCriteria(criteria) {
   const result = [];
   let counter = 0;
   (criteria || []).forEach(c => {
     const standards = [];
     (c.standards || []).forEach(s => {
-      if (!stdEvalFails(s)) return;
+      if (!stdFails(s)) return;
       counter++;
       const stdTrackId = 'SEG::S' + counter;
       const eos = (s.eos || [])
@@ -4849,7 +4850,7 @@ function renderSeguimientoPanel() {
     container.innerHTML = `
       <div class="phase-placeholder">
         <strong>Sin estándares pendientes</strong><br>
-        No hay estándares que no cumplan en la evaluación, por lo que no hay elementos que requieran estabilización.
+        No hay estándares que no cumplan en la evaluación, ni estándares con algún elemento orientativo que no cumpla, por lo que no hay elementos que requieran estabilización.
       </div>
     `;
     return;
@@ -4870,7 +4871,7 @@ function renderSeguimientoPanel() {
     <div class="row" style="justify-content:flex-end;margin-bottom:14px;">
       <button id="generateSeguimientoPdfBtn" class="btn-generate-seguimiento" type="button" onclick="generateSeguimientoPdf()">Generar Informe de Estabilización</button>
     </div>
-    <div class="seg-header-note">Estabilización iniciada${startedText ? ': ' + escapeHtml(startedText) : ''}. Se muestran únicamente los estándares que no cumplían en la evaluación.</div>
+    <div class="seg-header-note">Estabilización iniciada${startedText ? ': ' + escapeHtml(startedText) : ''}. Se muestran los estándares que no cumplían en la evaluación, y los que cumplían pero tienen algún elemento orientativo que no cumple.</div>
     <div id="seguimientoTopSections">${renderSeguimientoResumenBox()}${renderSeguimientoHighlightedCriterionBox()}</div>
     ${html}
   `;
@@ -5031,7 +5032,7 @@ function customConfirm(message) {
 async function startSeguimientoPhase() {
   if (!currentData || !currentData.criteria || !currentData.criteria.length) return;
   if (currentData.seguimientoActive) return;
-  const ok = await customConfirm('Al comenzar la fase de estabilización, el contenido de la Fase de evaluación quedará bloqueado y ya no podrás generar el Informe de Evaluación ni editar sus datos. Se copiarán a la Fase de estabilización todos los estándares que no cumplían. ¿Deseas continuar?');
+  const ok = await customConfirm('Al comenzar la fase de estabilización, el contenido de la Fase de evaluación quedará bloqueado y ya no podrás generar el Informe de Evaluación ni editar sus datos. Se copiarán a la Fase de estabilización todos los estándares que no cumplían, y los que cumplían pero tienen algún elemento orientativo que no cumple. ¿Deseas continuar?');
   if (!ok) return;
 
   currentData.seguimientoCriteria = buildSeguimientoCriteria(currentData.criteria);
