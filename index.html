@@ -1276,7 +1276,7 @@
     </div>
     <div class="app-header-center">
       <div class="app-header-title">Gestor de informes</div>
-      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v3.0</div>
+      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v3.1</div>
       <div class="app-header-subtitle">Centros de Atención Social a Personas con Problemas de Salud Mental<br>Comprometidos contra la Violencia de Género</div>
     </div>
     <div class="app-header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
@@ -1665,7 +1665,7 @@ document.getElementById('generatePdfBtn').addEventListener('click', async () => 
   if (!requiredCertificationResponsible) missing.push({ label:'Responsable del centro para el seguimiento de la certificación', selector:'#certificationResponsibleInput' });
   if (!requiredSelfEvalStartDate) missing.push({ label:'Fecha de inicio de autoevaluación', selector:'#selfEvalStartDateInput' });
   if (!requiredExternalEvalDate) missing.push({ label:'Fecha de evaluación externa', selector:'#externalEvalDateInput' });
-  if (highlightCriterionRequired && !requiredHighlightedCriterion) missing.push({ label:'Criterio destacado', selector:'#highlightCriterionSelect' });
+  if (highlightCriterionRequired && !requiredHighlightedCriterion && !currentData?.highlightedCriterionManual) missing.push({ label:'Criterio destacado', selector:'#highlightCriterionSelect' });
 
   if (missing.length) {
     markMissingFields(missing);
@@ -4052,17 +4052,38 @@ function ensureHighlightedCriterion(data, forceAuto=false) {
     return '';
   }
   const autoCode = chooseAutomaticHighlightedCriterion(data.criteria || []);
-  if (forceAuto || !data.highlightedCriterionManual || !data.highlightedCriterionCode) {
+  // Si el evaluador eligió "Ninguno" a mano (manual=true, código vacío), se respeta
+  // esa elección y no se vuelve a forzar el automático.
+  if (forceAuto || !data.highlightedCriterionManual) {
     data.highlightedCriterionCode = autoCode;
     data.highlightedCriterionManual = false;
   }
   return autoCode;
 }
 
-function canUseHighlightedCriterion(data) {
-  if (!data) return false;
+// Un estándar "cumplido" debe tener al menos 2 fortalezas registradas para que se
+// pueda destacar algún criterio. Los estándares que no cumplen quedan exentos de
+// esta comprobación (no se les exige fortalezas).
+function standardHasEnoughFortalezas(standard) {
+  return (standard?.fortalezas || []).filter(x => String(x || '').trim()).length >= 2;
+}
+function allPassingStandardsHaveEnoughFortalezas(data) {
+  return (data?.criteria || []).every(c =>
+    (c.standards || []).every(s => stdEvalFails(s) || standardHasEnoughFortalezas(s))
+  );
+}
+
+// Motivo por el que no se puede destacar ningún criterio, o null si sí se puede.
+function highlightedCriterionBlockReason(data) {
+  if (!data) return 'esenciales';
   const stats = computeSummaryStats(data);
-  return stats.noCumplenEsenciales === 0;
+  if (stats.noCumplenEsenciales !== 0) return 'esenciales';
+  if (!allPassingStandardsHaveEnoughFortalezas(data)) return 'fortalezas';
+  return null;
+}
+
+function canUseHighlightedCriterion(data) {
+  return highlightedCriterionBlockReason(data) === null;
 }
 
 function getCriterionHighlightDetails(data, code) {
@@ -4083,20 +4104,26 @@ function getCriterionHighlightDetails(data, code) {
 }
 
 function renderHighlightedCriterionSelector(data, autoCode) {
-  if (!canUseHighlightedCriterion(data)) {
+  const blockReason = highlightedCriterionBlockReason(data);
+  if (blockReason) {
+    const blockMessage = blockReason === 'fortalezas'
+      ? 'Ningún estándar cumplido tiene al menos dos fortalezas, no se selecciona un criterio destacado.'
+      : 'Como existen estándares obligatorios no cumplidos, no se selecciona un criterio destacado.';
     return `
       <div id="highlightCriterionPanel" class="highlight-criterion-panel">
         <div class="highlight-criterion-row">
           <label>Criterio destacado</label>
         </div>
-        <div class="highlight-criterion-help">Como existen estándares obligatorios no cumplidos, no se selecciona un criterio destacado.</div>
+        <div class="highlight-criterion-help">${blockMessage}</div>
       </div>
     `;
   }
 
-  const selected = String(data?.highlightedCriterionCode || autoCode || '').trim();
+  const isManual = !!data?.highlightedCriterionManual;
+  const selected = isManual ? String(data?.highlightedCriterionCode || '').trim() : String(autoCode || '').trim();
   const autoCriterion = (data?.criteria || []).find(c => String(c.code || '').trim() === String(autoCode));
-  const selectedIsAuto = selected && selected === String(autoCode || '') && !data?.highlightedCriterionManual;
+  const selectedIsAuto = !isManual && selected && selected === String(autoCode || '');
+  const selectedIsNone = isManual && !selected;
   const selectedDetails = getCriterionHighlightDetails(data, selected);
   const options = (data?.criteria || []).map((criterion) => {
     const code = String(criterion.code || '').trim();
@@ -4104,23 +4131,27 @@ function renderHighlightedCriterionSelector(data, autoCode) {
     return `<option value="${escapeHtml(code)}" ${code === selected ? 'selected' : ''}>${escapeHtml(title)}</option>`;
   }).join('');
 
-  const modeText = data?.highlightedCriterionManual ? 'Selección manual' : 'Selección automática';
-  const manualClass = data?.highlightedCriterionManual ? ' manual' : '';
+  const modeText = isManual ? 'Selección manual' : 'Selección automática';
+  const manualClass = isManual ? ' manual' : '';
   const detailText = selectedDetails
     ? `El criterio seleccionado cumple <strong>${formatPercentValue(selectedDetails.passPercent)}</strong> de sus estándares (${selectedDetails.passCount}/${selectedDetails.totalStandards}) y suma <strong>${selectedDetails.fortalezas}</strong> fortalezas.`
-    : 'Selecciona un criterio para completar este campo obligatorio.';
+    : selectedIsNone
+      ? 'No se destacará ningún criterio en el informe.'
+      : 'Selecciona un criterio para completar este campo.';
   const selectionText = selectedIsAuto
     ? 'Puedes cambiarlo manualmente si el evaluador considera que otro criterio debe destacarse.'
-    : autoCriterion
-      ? `El valor actual no coincide con la recomendación automática: ${escapeHtml(displayCriterionTitle(autoCriterion.title))}.`
-      : 'No hay recomendación automática: ningún criterio cumple todos sus estándares.';
+    : selectedIsNone
+      ? 'Has elegido no destacar ningún criterio.'
+      : autoCriterion
+        ? `El valor actual no coincide con la recomendación automática: ${escapeHtml(displayCriterionTitle(autoCriterion.title))}.`
+        : 'No hay recomendación automática: ningún criterio cumple todos sus estándares.';
 
   return `
     <div id="highlightCriterionPanel" class="highlight-criterion-panel">
       <div class="highlight-criterion-row">
-        <label for="highlightCriterionSelect">Criterio destacado *</label>
+        <label for="highlightCriterionSelect">Criterio destacado</label>
         <select id="highlightCriterionSelect" class="highlight-criterion-select">
-          <option value=""></option>
+          <option value="" ${selected === '' ? 'selected' : ''}>Ninguno</option>
           ${options}
         </select>
         <span class="highlight-criterion-mode${manualClass}">${modeText}</span>
@@ -4926,7 +4957,7 @@ function ensureSeguimientoHighlightedCriterion(patchedCriteria, forceAuto=false)
     return '';
   }
   const autoCode = chooseAutomaticHighlightedCriterion(patchedCriteria);
-  if (forceAuto || !currentData.seguimientoHighlightedCriterionManual || !currentData.seguimientoHighlightedCriterionCode) {
+  if (forceAuto || !currentData.seguimientoHighlightedCriterionManual) {
     currentData.seguimientoHighlightedCriterionCode = autoCode;
     currentData.seguimientoHighlightedCriterionManual = false;
   }
@@ -4952,20 +4983,26 @@ function renderSeguimientoHighlightedCriterionBox() {
   const patchedData = { criteria: patchedCriteria };
   const autoCode = ensureSeguimientoHighlightedCriterion(patchedCriteria);
 
-  if (!canUseHighlightedCriterion(patchedData)) {
+  const blockReason = highlightedCriterionBlockReason(patchedData);
+  if (blockReason) {
+    const blockMessage = blockReason === 'fortalezas'
+      ? 'Ningún estándar cumplido tiene al menos dos fortalezas, no se selecciona un criterio destacado.'
+      : 'Como existen estándares esenciales no cumplidos en la estabilización, no se selecciona un criterio destacado.';
     return `
       <div id="seguimientoHighlightCriterionPanel" class="highlight-criterion-panel">
         <div class="highlight-criterion-row">
           <label>Criterio destacado</label>
         </div>
-        <div class="highlight-criterion-help">Como existen estándares esenciales no cumplidos en la estabilización, no se selecciona un criterio destacado.</div>
+        <div class="highlight-criterion-help">${blockMessage}</div>
       </div>
     `;
   }
 
-  const selected = String(currentData.seguimientoHighlightedCriterionCode || autoCode || '').trim();
+  const isManual = !!currentData.seguimientoHighlightedCriterionManual;
+  const selected = isManual ? String(currentData.seguimientoHighlightedCriterionCode || '').trim() : String(autoCode || '').trim();
   const autoCriterion = patchedCriteria.find(c => String(c.code || '').trim() === String(autoCode));
-  const selectedIsAuto = selected && selected === String(autoCode || '') && !currentData.seguimientoHighlightedCriterionManual;
+  const selectedIsAuto = !isManual && selected && selected === String(autoCode || '');
+  const selectedIsNone = isManual && !selected;
   const selectedDetails = getCriterionHighlightDetails(patchedData, selected);
   const options = patchedCriteria.map((criterion) => {
     const code = String(criterion.code || '').trim();
@@ -4973,23 +5010,27 @@ function renderSeguimientoHighlightedCriterionBox() {
     return `<option value="${escapeHtml(code)}" ${code === selected ? 'selected' : ''}>${escapeHtml(title)}</option>`;
   }).join('');
 
-  const modeText = currentData.seguimientoHighlightedCriterionManual ? 'Selección manual' : 'Selección automática';
-  const manualClass = currentData.seguimientoHighlightedCriterionManual ? ' manual' : '';
+  const modeText = isManual ? 'Selección manual' : 'Selección automática';
+  const manualClass = isManual ? ' manual' : '';
   const detailText = selectedDetails
     ? `El criterio seleccionado cumple <strong>${formatPercentValue(selectedDetails.passPercent)}</strong> de sus estándares (${selectedDetails.passCount}/${selectedDetails.totalStandards}) y suma <strong>${selectedDetails.fortalezas}</strong> fortalezas.`
-    : 'Selecciona un criterio para completar este campo.';
+    : selectedIsNone
+      ? 'No se destacará ningún criterio en el informe.'
+      : 'Selecciona un criterio para completar este campo.';
   const selectionText = selectedIsAuto
     ? 'Puedes cambiarlo manualmente si el evaluador considera que otro criterio debe destacarse.'
-    : autoCriterion
-      ? `El valor actual no coincide con la recomendación automática: ${escapeHtml(displayCriterionTitle(autoCriterion.title))}.`
-      : 'No hay recomendación automática: ningún criterio cumple todos sus estándares.';
+    : selectedIsNone
+      ? 'Has elegido no destacar ningún criterio.'
+      : autoCriterion
+        ? `El valor actual no coincide con la recomendación automática: ${escapeHtml(displayCriterionTitle(autoCriterion.title))}.`
+        : 'No hay recomendación automática: ningún criterio cumple todos sus estándares.';
 
   return `
     <div id="seguimientoHighlightCriterionPanel" class="highlight-criterion-panel">
       <div class="highlight-criterion-row">
         <label for="seguimientoHighlightCriterionSelect">Criterio destacado</label>
         <select id="seguimientoHighlightCriterionSelect" class="highlight-criterion-select" onchange="handleSeguimientoHighlightChange(this)">
-          <option value=""></option>
+          <option value="" ${selected === '' ? 'selected' : ''}>Ninguno</option>
           ${options}
         </select>
         <span class="highlight-criterion-mode${manualClass}">${modeText}</span>
