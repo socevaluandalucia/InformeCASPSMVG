@@ -1276,7 +1276,7 @@
     </div>
     <div class="app-header-center">
       <div class="app-header-title">Gestor de informes</div>
-      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v3.1</div>
+      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v3.2</div>
       <div class="app-header-subtitle">Centros de Atención Social a Personas con Problemas de Salud Mental<br>Comprometidos contra la Violencia de Género</div>
     </div>
     <div class="app-header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
@@ -4031,17 +4031,24 @@ function chooseAutomaticHighlightedCriterion(criteria=[]) {
       code: String(criterion.code || '').trim(),
       allPass: criterionStandardsAllPass(standardsList),
       fortalezas: counts.fortalezas,
+      areasMejora: counts.areasMejora,
       standardsPass,
       totalStandards: standardsList.length
     };
   }).filter(x => x.code);
 
-  const fullPass = ranked
-    .filter(x => x.allPass)
-    .sort((a, b) => (b.fortalezas - a.fortalezas) || (b.totalStandards - a.totalStandards) || String(a.code).localeCompare(String(b.code), 'es'));
+  const candidates = ranked.filter(x => x.allPass);
+  if (!candidates.length) return '';
 
-  if (fullPass.length) return fullPass[0].code;
-  return '';
+  // Preferencia 1: el candidato con más fortalezas, siempre que tenga 2 o más.
+  const byFortalezas = [...candidates]
+    .sort((a, b) => (b.fortalezas - a.fortalezas) || (b.totalStandards - a.totalStandards) || String(a.code).localeCompare(String(b.code), 'es'));
+  if (byFortalezas[0].fortalezas >= 2) return byFortalezas[0].code;
+
+  // Preferencia 2 (ningún candidato llega a 2 fortalezas): el que tenga menos áreas de mejora.
+  const byAreasMejora = [...candidates]
+    .sort((a, b) => (a.areasMejora - b.areasMejora) || (b.fortalezas - a.fortalezas) || (b.totalStandards - a.totalStandards) || String(a.code).localeCompare(String(b.code), 'es'));
+  return byAreasMejora[0].code;
 }
 
 function ensureHighlightedCriterion(data, forceAuto=false) {
@@ -4061,24 +4068,11 @@ function ensureHighlightedCriterion(data, forceAuto=false) {
   return autoCode;
 }
 
-// Un estándar "cumplido" debe tener al menos 2 fortalezas registradas para que se
-// pueda destacar algún criterio. Los estándares que no cumplen quedan exentos de
-// esta comprobación (no se les exige fortalezas).
-function standardHasEnoughFortalezas(standard) {
-  return (standard?.fortalezas || []).filter(x => String(x || '').trim()).length >= 2;
-}
-function allPassingStandardsHaveEnoughFortalezas(data) {
-  return (data?.criteria || []).every(c =>
-    (c.standards || []).every(s => stdEvalFails(s) || standardHasEnoughFortalezas(s))
-  );
-}
-
 // Motivo por el que no se puede destacar ningún criterio, o null si sí se puede.
 function highlightedCriterionBlockReason(data) {
   if (!data) return 'esenciales';
   const stats = computeSummaryStats(data);
   if (stats.noCumplenEsenciales !== 0) return 'esenciales';
-  if (!allPassingStandardsHaveEnoughFortalezas(data)) return 'fortalezas';
   return null;
 }
 
@@ -4106,9 +4100,7 @@ function getCriterionHighlightDetails(data, code) {
 function renderHighlightedCriterionSelector(data, autoCode) {
   const blockReason = highlightedCriterionBlockReason(data);
   if (blockReason) {
-    const blockMessage = blockReason === 'fortalezas'
-      ? 'Ningún estándar cumplido tiene al menos dos fortalezas, no se selecciona un criterio destacado.'
-      : 'Como existen estándares obligatorios no cumplidos, no se selecciona un criterio destacado.';
+    const blockMessage = 'Como existen estándares obligatorios no cumplidos, no se selecciona un criterio destacado.';
     return `
       <div id="highlightCriterionPanel" class="highlight-criterion-panel">
         <div class="highlight-criterion-row">
@@ -4985,9 +4977,7 @@ function renderSeguimientoHighlightedCriterionBox() {
 
   const blockReason = highlightedCriterionBlockReason(patchedData);
   if (blockReason) {
-    const blockMessage = blockReason === 'fortalezas'
-      ? 'Ningún estándar cumplido tiene al menos dos fortalezas, no se selecciona un criterio destacado.'
-      : 'Como existen estándares esenciales no cumplidos en la estabilización, no se selecciona un criterio destacado.';
+    const blockMessage = 'Como existen estándares esenciales no cumplidos en la estabilización, no se selecciona un criterio destacado.';
     return `
       <div id="seguimientoHighlightCriterionPanel" class="highlight-criterion-panel">
         <div class="highlight-criterion-row">
