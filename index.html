@@ -1276,7 +1276,7 @@
     </div>
     <div class="app-header-center">
       <div class="app-header-title">Gestor de informes</div>
-      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v3.2</div>
+      <div class="app-header-version" style="font-size:11px;color:#a0856a;font-weight:600;text-align:center;margin-top:2px;">v3.3</div>
       <div class="app-header-subtitle">Centros de Atención Social a Personas con Problemas de Salud Mental<br>Comprometidos contra la Violencia de Género</div>
     </div>
     <div class="app-header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
@@ -3026,7 +3026,7 @@ async function generateCoverPdf(mode = 'evaluacion', seguimientoContext = null) 
     doc.text('Violencia de Género', pageW/2 - 10, logoTextY + 10, {align:'left'});
   }
 
-  const textStartY = 145;
+  let textStartY = isSeguimiento ? 125 : 145;
   const lineGap = 14;
 
   doc.setFont('helvetica','normal');
@@ -3039,8 +3039,8 @@ async function generateCoverPdf(mode = 'evaluacion', seguimientoContext = null) 
     doc.setFont('helvetica','normal');
     doc.setFontSize(16);
     doc.setTextColor(0,0,0);
-    doc.text('TRAS SITUACIÓN DE PENDIENTE DE ESTÁNDARES', pageW/2, textStartY + 10, {align:'center'});
-    coverExtraLineUsed = 10;
+    doc.text('TRAS SITUACIÓN DE PENDIENTE DE ESTÁNDARES', pageW/2, textStartY + lineGap, {align:'center'});
+    coverExtraLineUsed = lineGap;
   }
 
   if (pdfCode) {
@@ -3050,17 +3050,20 @@ async function generateCoverPdf(mode = 'evaluacion', seguimientoContext = null) 
     doc.text(pdfCode, pageW/2, textStartY + coverExtraLineUsed + lineGap, {align:'center'});
   }
 
+  let centerEndY = textStartY + coverExtraLineUsed + lineGap * 2;
   if (pdfCenter) {
     doc.setFont('helvetica','bold');
     doc.setFontSize(16);
     doc.setTextColor(118,65,162);
-    const centerLines = doc.splitTextToSize(pdfCenter, 120);
-    doc.text(centerLines, pageW/2, textStartY + coverExtraLineUsed + (lineGap * 2), {align:'center'});
+    const centerLines = doc.splitTextToSize(pdfCenter, pageW - margin * 2);
+    doc.text(centerLines, pageW/2, centerEndY, {align:'center'});
+    centerEndY += (centerLines.length - 1) * lineGap;
   }
 
   if (logoPacto) {
     const fitMid = fitBox(logoPacto.width, logoPacto.height, 22, 14);
-    doc.addImage(logoPacto.dataUrl, 'PNG', (pageW - fitMid.w)/2, 210, fitMid.w, fitMid.h);
+    const logoY = Math.max(centerEndY + 12, 210);
+    doc.addImage(logoPacto.dataUrl, 'PNG', (pageW - fitMid.w)/2, logoY, fitMid.w, fitMid.h);
   }
 
   drawLowerLogos();
@@ -3941,7 +3944,12 @@ function switchPhaseTab(tab) {
   document.getElementById('phaseTabSeguimiento').classList.toggle('active', !isEval);
   document.getElementById('phaseTabBtnEvaluacion').classList.toggle('active', isEval);
   document.getElementById('phaseTabBtnSeguimiento').classList.toggle('active', !isEval);
-  if (!isEval) {
+  if (isEval) {
+    setTimeout(() => {
+      const report = document.getElementById('report');
+      if (report) { autosizeJustificationTextareas(report); autosizeEditableList(report); }
+    }, 50);
+  } else {
     // El panel estaba oculto (display:none) mientras se generaba su contenido,
     // así que las cajas no pudieron medir su altura real. Ahora que es visible,
     // se recalcula el tamaño de cada caja para que se ajuste al contenido.
@@ -5209,11 +5217,22 @@ function renderSection(title, items=[], codePrefix='') {
 
 
 
+function autosizeTextarea(ta) {
+  if (!ta) return;
+  ta.style.height = 'auto';
+  ta.style.overflowY = 'hidden';
+  ta.style.height = Math.max(36, ta.scrollHeight + 2) + 'px';
+}
+
 function autosizeJustificationTextareas(root=document) {
-  root.querySelectorAll('.justification-input').forEach((ta) => {
-    ta.style.height = 'auto';
-    ta.style.overflowY = 'hidden';
-    ta.style.height = Math.max(44, ta.scrollHeight + 2) + 'px';
+  root.querySelectorAll('.justification-input, .justification-textarea, .editable-list-textarea').forEach(ta => {
+    autosizeTextarea(ta);
+  });
+}
+
+function autosizeEditableList(root=document) {
+  root.querySelectorAll('.editable-list-item textarea, .editable-list-item').forEach(ta => {
+    if (ta.tagName === 'TEXTAREA') autosizeTextarea(ta);
   });
 }
 
